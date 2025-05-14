@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, Ea
 def train_simclr():
     # Load full dataset
     full_dataset = ContrastiveDataset(
-        "dataset_normalized.h5",
+        '/scratch-shared/tmp.Udl4HYbZtd/dataset_normalized_2018-2021.h5',
         transform=TemporalAugmentation()
     )
 
@@ -24,35 +24,43 @@ def train_simclr():
         [train_size, val_size],
         generator=torch.Generator().manual_seed(42)  # For reproducibility
     )
+    num_workers = 4  # Increased from 4
+    persistent_workers = True
+    prefetch_factor = 2  # Prefetch 2 batches per worker
+    pin_memory = True
+    batch_size = 16
+    epochs = 100
 
     # Create data loaders
     train_loader = DataLoader(
         train_dataset,
-        batch_size=16,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=4,
-        persistent_workers=True,
-        pin_memory=True,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor,
+        pin_memory=pin_memory,
         drop_last=True
     )
 
     val_loader = DataLoader(
         val_dataset,
-        batch_size=16,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=4,
-        persistent_workers=True,
-        pin_memory=True,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor,
+        pin_memory=pin_memory,
         drop_last=False  # Keep all samples for validation
     )
 
     # Model setup remains identical
     model = SimCLR(
         hidden_dim=128,
-        lr=5e-4,
+        lr=5e-4 * 16,
         temperature=0.07,
         weight_decay=1e-4,
-        max_epochs=1
+        max_epochs=epochs
     )
 
     # Trainer setup with validation
@@ -60,12 +68,12 @@ def train_simclr():
         precision='16-mixed',
         accelerator="auto",
         devices=1,
-        max_epochs=2,
+        max_epochs=epochs,
         callbacks=[
             ModelCheckpoint(
                 save_weights_only=True,
                 mode="max",
-                monitor="val_acc_top5"
+                monitor="val_acc_top1"
             ),
             LearningRateMonitor("epoch"),
             EarlyStopping(
@@ -74,9 +82,11 @@ def train_simclr():
                 mode="max"  # Stop when metric stops increasing
             )
         ],
-        default_root_dir=os.path.join(os.getcwd(), "saved_models")
-    )
+        default_root_dir='/scratch-shared/tmp.Udl4HYbZtd/models/simclr'
 
+    )
+    #os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "0"
+    #os.environ["NCCL_ALGO"] = "Tree"
     # Train with both loaders
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
