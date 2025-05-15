@@ -92,4 +92,5 @@ def train_simclr():
 
 
 if __name__ == "__main__":
+    print("Running train.py")
     train_simclr()
