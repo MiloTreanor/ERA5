@@ -28,12 +28,11 @@ class TemporalAugmentation:
         self.mean_filter = ApplyMeanFilter(kernel_size=5)
 
     def __call__(self, x):
-        # Apply cropping with 50% probability
-        if torch.rand(1) < 1:
+
+        if torch.rand(1) < 0.7:
             x = self.crop(x)
 
-        # Apply mean filter with 50% probability
-        if torch.rand(1) < 1:
+        if torch.rand(1) < 0.4:
             x = self.mean_filter(x)
 
         return x

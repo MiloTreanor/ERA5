@@ -2,7 +2,7 @@ import lightning.pytorch as pl
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
-from utils import dataset_precip
+from create_dataset.dataset_multivariate import SingleStepPrecipDataset
 import argparse
 import numpy as np
 
@@ -104,36 +104,15 @@ class PrecipRegressionBase(UNetBase):
         # )
         train_transform = None
         valid_transform = None
-        precip_dataset = (
-            dataset_precip.precipitation_maps_oversampled_h5
-            if self.hparams.use_oversampled_dataset
-            else dataset_precip.precipitation_maps_h5
-        )
-        self.train_dataset = precip_dataset(
-            in_file=self.hparams.dataset_folder,
-            num_input_images=self.hparams.num_input_images,
-            num_output_images=self.hparams.num_output_images,
-            train=True,
+        # Instantiate datasets directly from the HDF5 splits
+        self.train_dataset = SingleStepPrecipDataset(
+            h5_file=self.hparams.train_dataset,
             transform=train_transform,
         )
-        self.valid_dataset = precip_dataset(
-            in_file=self.hparams.dataset_folder,
-            num_input_images=self.hparams.num_input_images,
-            num_output_images=self.hparams.num_output_images,
-            train=True,
+        self.valid_dataset = SingleStepPrecipDataset(
+            h5_file=self.hparams.val_dataset,
             transform=valid_transform,
         )
-
-        num_train = len(self.train_dataset)
-        indices = list(range(num_train))
-        split = int(np.floor(self.hparams.valid_size * num_train))
-
-        np.random.shuffle(indices)
-
-        train_idx, valid_idx = indices[split:], indices[:split]
-        self.train_sampler = SubsetRandomSampler(train_idx)
-        self.valid_sampler = SubsetRandomSampler(valid_idx)
-
     def train_dataloader(self):
         train_loader = DataLoader(
             self.train_dataset,
@@ -141,8 +120,9 @@ class PrecipRegressionBase(UNetBase):
             sampler=self.train_sampler,
             pin_memory=True,
             # The following can/should be tweaked depending on the number of CPU cores
-            num_workers=1,
+            num_workers=self.hparams.num_workers,
             persistent_workers=True,
+            prefetch_factor=self.hparams.prefetch_factor
         )
         return train_loader
 
@@ -153,8 +133,9 @@ class PrecipRegressionBase(UNetBase):
             sampler=self.valid_sampler,
             pin_memory=True,
             # The following can/should be tweaked depending on the number of CPU cores
-            num_workers=1,
+            num_workers=self.hparams.num_workers,
             persistent_workers=True,
+            prefetch_factor=self.hparams.prefetch_factor
         )
         return valid_loader
 

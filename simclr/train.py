@@ -11,24 +11,20 @@ from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, Ea
 
 def train_simclr():
     # Load full dataset
-    full_dataset = ContrastiveDataset(
+    train_dataset = ContrastiveDataset(
         '/scratch-shared/tmp.Udl4HYbZtd/dataset_normalized_2018-2021.h5',
         transform=TemporalAugmentation()
     )
-
-    # Split into train/val (80/20 split)
-    train_size = int(0.8 * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-    train_dataset, val_dataset = random_split(
-        full_dataset,
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(42)  # For reproducibility
+    val_dataset = ContrastiveDataset(
+        '/scratch-shared/tmp.Udl4HYbZtd/test_dataset_normalized.h5',
+        transform=TemporalAugmentation()
     )
-    num_workers = 4  # Increased from 4
+
+    num_workers = 32  # Increased from 4
     persistent_workers = True
-    prefetch_factor = 2  # Prefetch 2 batches per worker
+    prefetch_factor = 4  # Prefetch 2 batches per worker
     pin_memory = True
-    batch_size = 16
+    batch_size = 64
     epochs = 100
 
     # Create data loaders
@@ -82,7 +78,7 @@ def train_simclr():
                 mode="max"  # Stop when metric stops increasing
             )
         ],
-        default_root_dir='/scratch-shared/tmp.Udl4HYbZtd/models/simclr'
+        default_root_dir='/scratch-shared/tmp.Udl4HYbZtd/models/simclr_v2'
 
     )
     #os.environ["NCCL_ASYNC_ERROR_HANDLING"] = "0"

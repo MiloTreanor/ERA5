@@ -2,7 +2,7 @@ from models.unet_parts import Down, DoubleConv, Up, OutConv
 from models.unet_parts_depthwise_separable import DoubleConvDS, UpDS, DownDS
 from models.layers import CBAM
 from models.regression_lightning import PrecipRegressionBase, PersistenceModel
-
+import torch
 
 class UNet(PrecipRegressionBase):
     def __init__(self, hparams):
@@ -144,7 +144,42 @@ class UNetDSAttention(PrecipRegressionBase):
         self.up4 = UpDS(128, 64, self.bilinear, kernels_per_layer=kernels_per_layer)
 
         self.outc = OutConv(64, self.n_classes)
+        if hasattr(hparams, "pretrained_encoder_path") and hparams.pretrained_encoder_path:
+            self._load_encoder_weights(hparams.pretrained_encoder_path, freeze=hparams.freeze_encoder)
 
+    def _load_encoder_weights(self, checkpoint_path: str, freeze: bool = True):
+        """Load encoder weights from SimCLR checkpoint"""
+        # Load checkpoint and extract encoder state
+        checkpoint = torch.load(checkpoint_path)
+        encoder_state = {
+            k.replace("encoder.", ""): v
+            for k, v in checkpoint["state_dict"].items()
+            if k.startswith("encoder.")
+        }
+
+        # Map sequential indices to UNet layer names
+        encoder_layers = [
+            "inc", "cbam1", "down1", "cbam2", "down2",
+            "cbam3", "down3", "cbam4", "down4", "cbam5"
+        ]
+
+        # Build state dict for U-Net
+        unet_state_dict = {}
+        for key, value in encoder_state.items():
+            parts = key.split(".")
+            layer_idx = int(parts[0])  # First part is sequential index
+            if layer_idx >= len(encoder_layers):
+                continue  # Skip pooling layers
+            new_key = ".".join([encoder_layers[layer_idx]] + parts[1:])
+            unet_state_dict[new_key] = value
+
+        # Load into U-Net and freeze if needed
+        self.load_state_dict(unet_state_dict, strict=False)  # strict=False ignores decoder
+
+        if freeze:
+            for layer_name in encoder_layers:
+                for param in getattr(self, layer_name).parameters():
+                    param.requires_grad_(False)
     def forward(self, x):
         x1 = self.inc(x)
         x1Att = self.cbam1(x1)

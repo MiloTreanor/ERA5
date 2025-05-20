@@ -5,8 +5,8 @@ def load_encoder():
     hparams = {
         "n_channels": 12,
         "n_classes": 1,
-        "bilinear": False,
-        "reduction_ratio": 4,
+        "bilinear": True,
+        "reduction_ratio": 16,
         "kernels_per_layer": 2
     }
     base = UNetDSAttention(hparams=hparams)
