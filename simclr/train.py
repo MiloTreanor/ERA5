@@ -8,8 +8,25 @@ from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor, EarlyStopping
 
+import webdataset as wds
+
+def wds_loader(pattern, batch_size, shuffle=True):
+    return wds.WebDataset(
+        pattern,
+        nodesplitter=wds.split_by_node,
+        shardshuffle=shuffle,
+    ).shuffle(1000 if shuffle else 0).decode("torch").to_tuple("input.pth").map(
+        lambda x: TemporalAugmentation()(x[0])  # Apply your transform
+    ).batched(batch_size, partial=not shuffle)
 
 def train_simclr():
+    num_workers = 16  # Increased from 4
+    persistent_workers = True
+    prefetch_factor = 4  # Prefetch 2 batches per worker
+    pin_memory = True
+    batch_size = 128
+    epochs = 400
+    """
     # Load full dataset
     train_dataset = ContrastiveDataset(
         '/scratch-shared/tmp.Udl4HYbZtd/dataset_normalized_2018-2021.h5',
@@ -20,12 +37,7 @@ def train_simclr():
         transform=TemporalAugmentation()
     )
 
-    num_workers = 32  # Increased from 4
-    persistent_workers = True
-    prefetch_factor = 4  # Prefetch 2 batches per worker
-    pin_memory = True
-    batch_size = 64
-    epochs = 100
+
 
     # Create data loaders
     train_loader = DataLoader(
@@ -49,6 +61,13 @@ def train_simclr():
         pin_memory=pin_memory,
         drop_last=False  # Keep all samples for validation
     )
+    """
+    train_pattern = "/scratch-shared/tmp.Udl4HYbZtd/wds_train/train-{000000..000999}.tar"
+    val_pattern = "/scratch-shared/tmp.Udl4HYbZtd/wds_val/val-{000000..000001}.tar"
+
+    # Create data loaders
+    train_loader = wds_loader(train_pattern, batch_size=batch_size, shuffle=True)
+    val_loader = wds_loader(val_pattern, batch_size=batch_size, shuffle=False)
 
     # Model setup remains identical
     model = SimCLR(
@@ -74,8 +93,8 @@ def train_simclr():
             LearningRateMonitor("epoch"),
             EarlyStopping(
                 monitor="val_loss",  # Monitor validation loss
-                patience=10,  # Wait 10 epochs without improvement
-                mode="max"  # Stop when metric stops increasing
+                patience=15,  # Wait 10 epochs without improvement
+                mode="min"  # Stop when metric stops decreasing
             )
         ],
         default_root_dir='/scratch-shared/tmp.Udl4HYbZtd/models/simclr_v2'

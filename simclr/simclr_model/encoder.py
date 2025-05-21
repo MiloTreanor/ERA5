@@ -12,13 +12,7 @@ def load_encoder():
     base = UNetDSAttention(hparams=hparams)
     return nn.Sequential(
         base.inc,
-        base.cbam1,
         base.down1,
-        base.cbam2,
         base.down2,
-        base.cbam3,
         base.down3,
-        base.cbam4,
-        base.down4,
-        base.cbam5,
-        nn.AdaptiveAvgPool2d((1, 1)))
+        base.down4)

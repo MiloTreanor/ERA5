@@ -10,10 +10,11 @@ from simclr.simclr_model.simclr import SimCLR  # Your model class
 from similarities import (analyze_similarities, check_embedding_variance,
                          temporal_consistency, augmentation_sensitivity)
 from activation_maps import visualize_all_layers
+from models.unet_precip_regression_lightning import UNetDSAttention
 
 def main():
     # 1. Load trained model
-    checkpoint_path = "simclr_logs/version_6/checkpoints/epoch=9-step=550.ckpt"
+    checkpoint_path = "smat_multiv2/UNetDSAttention_rain_threshold_50_epoch=32-val_loss=13749.474609.ckpt"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = SimCLR.load_from_checkpoint(checkpoint_path, map_location='cpu', weights_only=True).to(device)
 
@@ -32,11 +33,11 @@ def main():
 
     # 4. Run analysis with memory limits
     with torch.inference_mode():
-        analyze_similarities(model, val_loader, device=device)
+        #analyze_similarities(model, val_loader, device=device)
         #check_embedding_variance(model, val_loader, device=device)
         #temporal_consistency(model, full_dataset, device=device)
         #augmentation_sensitivity(model, full_dataset, device=device)
-        #visualize_all_layers(model, full_dataset, device=device)
+        visualize_all_layers(model, full_dataset, device=device)
 
 if __name__ == '__main__':
     torch.multiprocessing.freeze_support()  # Windows-specific fix

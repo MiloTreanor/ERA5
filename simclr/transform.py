@@ -32,7 +32,7 @@ class TemporalAugmentation:
         if torch.rand(1) < 0.7:
             x = self.crop(x)
 
-        if torch.rand(1) < 0.4:
+        if torch.rand(1) < 0.5:
             x = self.mean_filter(x)
 
         return x

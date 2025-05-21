@@ -54,7 +54,7 @@ def train_regression(hparams, find_batch_size_automatically: bool = False):
         logger=tb_logger,
         callbacks=[checkpoint_callback, earlystopping_callback, lr_monitor],
         val_check_interval=hparams.val_check_interval,
-        accumulate_grad_batches=2,
+        accumulate_grad_batches=1,
     )
 
     if find_batch_size_automatically:
@@ -75,24 +75,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--train_dataset",
         type=str,
-        default="C:/Users/milot/PycharmProjects/ERA5/create_dataset/small_dataset_normalized.h5",
+        default="C:/Users/milot/PycharmProjects/ERA5/create_dataset/test_dataset_normalized.h5",
         help="Path to the training H5 file"
     )
     parser.add_argument(
         "--val_dataset",
         type=str,
-        default="C:/Users/milot/PycharmProjects/ERA5/create_dataset/small_dataset_normalized.h5",
+        default="C:/Users/milot/PycharmProjects/ERA5/create_dataset/test_dataset_normalized.h5",
         help="Path to the validation H5 file"
     )
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size for training")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
     # Use store_true so that --fast_dev_run sets the flag to True when provided
     parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="Checkpoint path to resume training")
     parser.add_argument("--val_check_interval", type=float, default=None, help="Validation check interval")
-    parser.add_argument("--num_workers", type=int, default=1)
-    parser.add_argument("--prefetch_factor", type=int, default=1)
+    parser.add_argument("--num_workers", type=int, default=16)
+    parser.add_argument("--prefetch_factor", type=int, default=4)
 
     parser.add_argument(
         "--pretrained_encoder_path",

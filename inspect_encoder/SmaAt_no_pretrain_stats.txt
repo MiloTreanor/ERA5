@@ -1,0 +1,8 @@
+Model Performance Evaluation:
+MSE: 0.0104 (mm^2/h^2)
+MAE: 0.0254 (mm/h)
+Precision: 0.8297
+Recall: 0.7826
+CSI: 0.6743
+FAR: 0.1703
+F1 Score: 0.8055

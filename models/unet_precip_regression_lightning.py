@@ -159,9 +159,7 @@ class UNetDSAttention(PrecipRegressionBase):
 
         # Map sequential indices to UNet layer names
         encoder_layers = [
-            "inc", "cbam1", "down1", "cbam2", "down2",
-            "cbam3", "down3", "cbam4", "down4", "cbam5"
-        ]
+            "inc", "down1", "down2", "down3",  "down4"]
 
         # Build state dict for U-Net
         unet_state_dict = {}

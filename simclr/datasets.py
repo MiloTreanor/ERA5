@@ -24,7 +24,7 @@ class ContrastiveDataset(Dataset):
             orig_img = torch.from_numpy(orig_img).float()
 
             # Get temporal neighbor
-            shift = random.choice([-2, -1,  1, 2])
+            shift = random.choice([-1,  1])
 
             neighbor_idx = np.clip(idx + shift, 0, len(self) - 1)
             neighbor = f['data'][neighbor_idx]

@@ -25,52 +25,50 @@ class SimCLR(pl.LightningModule):
             nn.Linear(encoder_dim, 4 * hidden_dim),
             nn.ReLU(inplace=True),
             nn.Linear(4 * hidden_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim)
         )
 
     def info_nce_loss(self, batch, mode='train'):
         x1, x2 = batch
-        imgs = torch.cat([x1, x2], dim=0)      # [2N, C, H, W]
+        imgs = torch.cat([x1, x2], dim=0)  # [2N, C, H, W]
         N = x1.size(0)
 
-        # Encode + pool + project + normalize
-        feats = self.encoder(imgs)             # [2N, C, H, W]
-        feats = feats.mean(dim=(2, 3))         # [2N, C]
-        z = self.projection(feats)             # [2N, D]
-        z = F.normalize(z, dim=1)
+        # Encode + project + normalize
+        feats = self.encoder(imgs)
+        feats = feats.mean(dim=(2, 3))  # [2N, C]
+        z = self.projection(feats)
+        z = F.normalize(z, dim=1)  # [2N, D]
 
         # Similarity matrix
         sim = torch.mm(z, z.T) / self.hparams.temperature
-        mask = torch.eye(2 * N, device=sim.device).bool()
-        # Use a half-safe negative fill value
-        neg_val = torch.tensor(-1e4, dtype=sim.dtype, device=sim.device)
-        sim.masked_fill_(mask, neg_val)
+        mask_self = torch.eye(2 * N, dtype=torch.bool, device=sim.device)
+        neg_value = torch.finfo(sim.dtype).min
+        sim.masked_fill_(mask_self, neg_value)  # More stable than -1e4
 
-        # Construct labels: positive of i is i+N mod 2N
+        # Positive pairs: (x1_i, x2_i) and (x2_i, x1_i)
         labels = torch.arange(2 * N, device=sim.device)
         labels = (labels + N) % (2 * N)
+        mask_pos = torch.zeros_like(sim, dtype=torch.bool)
+        mask_pos[torch.arange(2 * N), labels] = True
 
-        # Use cross-entropy as NT-Xent loss
-        loss = F.cross_entropy(sim, labels)
+        # NT-Xent loss calculation
+        pos_sim = sim[mask_pos]
+        neg_sim = sim.masked_fill(mask_pos | mask_self, neg_value)
+        logits = torch.cat([pos_sim.unsqueeze(1), neg_sim], dim=1)
+        loss = -logits[:, 0] + torch.logsumexp(logits, dim=1)
+        loss = loss.mean()
 
+        # Validation metrics only when needed
+        #if mode == 'val':
+        comb_sim = logits  # [2N, 2N-1]
+        sorted_indices = comb_sim.argsort(dim=1, descending=True)
+        pos_rank = torch.nonzero(sorted_indices == 0, as_tuple=True)[1]
+        top1_acc = (pos_rank == 0).float().mean()
+        top5_acc = (pos_rank < 5).float().mean()
 
-        # Retrieval metrics: rank of positive in logits
-        # sim already scaled and masked
+        self.log(f'{mode}_acc_top1', top1_acc, prog_bar=True)
+        self.log(f'{mode}_acc_top5', top5_acc, prog_bar=True)
 
-
-        if mode == 'val':
-            pos_sim = sim[torch.arange(2 * N), labels].unsqueeze(1)  # [2N, 1]
-            neg_sim = sim.clone()
-            neg_sim[torch.arange(2 * N), labels] = neg_val  # mask out positives
-            all_sim = torch.cat([pos_sim, neg_sim], dim=1)  # [2N, 2N]
-            ranks = all_sim.argsort(dim=1, descending=True).argmin(dim=1)
-            sorted_indices = sim.argsort(dim=1, descending=True)
-            ranks = (sorted_indices == labels.unsqueeze(1)).nonzero()[:, 1]
-            top1_acc = (ranks == 0).float().mean()
-            top5_acc = (ranks < 5).float().mean()
-            self.log(f'{mode}_acc_top1', top1_acc, prog_bar=True)
-            self.log(f'{mode}_acc_top5', top5_acc, prog_bar=True)
-            self.log(f'{mode}_loss', loss, prog_bar=True)
+        self.log(f'{mode}_loss', loss, prog_bar=(mode == 'val'))
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -89,7 +87,7 @@ class SimCLR(pl.LightningModule):
         warmup = LinearLR(
             optimizer,
             start_factor=0.01,
-            total_iters=10
+            total_iters=480000
         )
         cosine = CosineAnnealingLR(
             optimizer,
